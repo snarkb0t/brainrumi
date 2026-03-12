@@ -13,6 +13,7 @@ to run a program written in brainfuck:
 brainrumi path/to/program
 ```
 you can also optionally use the `-r` flag - standard output will be displayed raw instead of being encoded in UTF-8.
+<br>the `-d` flag allows you to view the execution time of each evaluation.
 
 ## technical stuff
 cells are stored in memory as signed 32-bit integers, and the interpreter is **not** limited to 30,000 cells. negative pointers do **not** exist in this implementation.
