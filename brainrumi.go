@@ -9,10 +9,12 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 )
 
 var (
-	raw bool
+	raw   bool
+	debug bool
 )
 
 func eval(code string, cells *[]int32, p *int) {
@@ -20,6 +22,8 @@ func eval(code string, cells *[]int32, p *int) {
 		scopes map[string]int = make(map[string]int, 0)
 
 		open []int = make([]int, 0)
+
+		tick time.Time = time.Now()
 	)
 
 	for s := 0; s < len(code); s++ {
@@ -72,7 +76,10 @@ func eval(code string, cells *[]int32, p *int) {
 		}
 	}
 
-	fmt.Println()
+	if debug {
+		fmt.Println("------")
+		fmt.Println("executed in", time.Since(tick))
+	}
 }
 
 func main() {
@@ -82,6 +89,8 @@ func main() {
 	)
 
 	flag.BoolVar(&raw, "r", false, "display raw cell data instead of encoded text")
+	flag.BoolVar(&debug, "d", false, "display interpreter info")
+
 	flag.Parse()
 
 	if len(flag.Args()) > 0 {
