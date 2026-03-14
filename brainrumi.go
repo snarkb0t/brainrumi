@@ -13,94 +13,161 @@ import (
 )
 
 var (
-	raw   bool
-	debug bool
+	raw       bool
+	debug     bool
+	optimized bool
+
+	cells []int32 = make([]int32, 1)
+	p     int     = 0
 )
 
-func eval(code string, cells *[]int32, p *int) {
+func evalCommand(cmd byte, increment int) {
+	switch cmd {
+	case '>':
+		if p += increment; p > len(cells)-1 {
+			for i := increment; i > 0; i-- {
+				cells = append(cells, 0)
+			}
+		}
+	case '<':
+		if p == 0 {
+			return
+		}
+
+		p -= increment
+	case '+':
+		cells[p] += int32(increment)
+	case '-':
+		cells[p] -= int32(increment)
+	case '.':
+		if raw {
+			fmt.Print(cells[p])
+		} else {
+			fmt.Print(string(cells[p]))
+		}
+
+		if increment > 1 {
+			evalCommand(cmd, increment-1)
+		}
+	case ',':
+		var putInto string
+		fmt.Scanln(&putInto)
+		cells[p] = int32([]byte(putInto)[0])
+	}
+}
+
+func eval(code string) {
 	var (
 		scopes map[string]int = make(map[string]int, 0)
+		open   []int          = make([]int, 0)
 
-		open []int = make([]int, 0)
+		instructions [][]int = make([][]int, 0)
 
 		tick time.Time = time.Now()
 	)
 
 	for s := 0; s < len(code); s++ {
-		switch code[s] {
-		case '[':
-			open = append(open, s)
-		case ']':
-			scopes[strconv.Itoa(open[len(open)-1])] = s
-			scopes[strconv.Itoa(s)] = open[len(open)-1]
-			open = open[:len(open)-1]
+		if optimized {
+
+			if len(instructions) == 0 || code[s] == '[' || code[s] == ']' {
+				goto addInstruction
+			} else {
+				latestInt := &instructions[len(instructions)-1]
+
+				if (*latestInt)[0] == int(code[s]) {
+					(*latestInt)[1]++
+					continue
+				} else {
+					goto addInstruction
+				}
+			}
+
+		addInstruction:
+			secondPointer := 1
+
+			switch code[s] {
+			case '[':
+				open = append(open, len(instructions))
+			case ']':
+				lastOpen := &(open[len(open)-1])
+				instructions[*lastOpen][1] = len(instructions)
+				secondPointer = *lastOpen
+
+				open = open[:len(open)-1]
+			}
+
+			instructions = append(instructions, []int{int(code[s]), secondPointer})
+		} else {
+			switch code[s] {
+			case '[':
+				open = append(open, s)
+			case ']':
+				scopes[strconv.Itoa(open[len(open)-1])] = s
+				scopes[strconv.Itoa(s)] = open[len(open)-1]
+				open = open[:len(open)-1]
+			}
 		}
 	}
 
 	open = nil
 
-	for i := 0; i < len(code); i++ {
-		switch code[i] {
-		case '>':
-			if *p += 1; *p > len(*cells)-1 {
-				*cells = append(*cells, 0)
-			}
-		case '<':
-			if *p == 0 {
-				continue
+	if optimized {
+		for i := 0; i < len(instructions); i++ {
+			instruction := instructions[i]
+			switch instruction[0] {
+			case '[':
+				if cells[p] == 0 {
+					i = instruction[1]
+					continue
+				}
+			case ']':
+				if cells[p] != 0 {
+					i = instruction[1]
+					continue
+				}
 			}
 
-			*p -= 1
-		case '+':
-			(*cells)[*p] += 1
-		case '-':
-			(*cells)[*p] -= 1
-		case '.':
-			if raw {
-				fmt.Print((*cells)[*p])
-			} else {
-				fmt.Print(string((*cells)[*p]))
+			evalCommand(byte(instruction[0]), instruction[1])
+		}
+	} else {
+		for i := 0; i < len(code); i++ {
+			switch code[i] {
+			case '[':
+				if cells[p] == 0 {
+					i = scopes[strconv.Itoa(i)]
+					continue
+				}
+			case ']':
+				if cells[p] != 0 {
+					i = scopes[strconv.Itoa(i)]
+					continue
+				}
 			}
-		case ',':
-			var putInto string
-			fmt.Scanln(&putInto)
-			(*cells)[*p] = int32([]byte(putInto)[0])
-		case '[':
-			if (*cells)[*p] == 0 {
-				i = scopes[strconv.Itoa(i)]
-			}
-		case ']':
-			if (*cells)[*p] != 0 {
-				i = scopes[strconv.Itoa(i)]
-			}
+
+			evalCommand(code[i], 1)
 		}
 	}
 
 	if debug {
 		fmt.Println("------")
-		fmt.Println("executed in", time.Since(tick))
+		fmt.Println("executed in", time.Since(tick), "|| optimizer", optimized)
 	}
 }
 
 func main() {
-	var (
-		cells []int32 = make([]int32, 1)
-		p     int     = 0
-	)
-
 	flag.BoolVar(&raw, "r", false, "display raw cell data instead of encoded text")
 	flag.BoolVar(&debug, "d", false, "display interpreter info")
+	flag.BoolVar(&optimized, "o", false, "toggle interpreter optimization")
 
 	flag.Parse()
 
 	if len(flag.Args()) > 0 {
-
 		file, err := os.ReadFile(flag.Arg(0))
 
 		if err != nil {
 			panic("file not found")
 		} else {
-			eval(string(file), &cells, &p)
+			eval(string(file))
 			return
 		}
 	}
@@ -123,6 +190,6 @@ func main() {
 			raw = !raw
 		}
 
-		eval(line, &cells, &p)
+		eval(line)
 	}
 }
