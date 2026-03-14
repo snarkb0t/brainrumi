@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -30,7 +31,7 @@ func evalCommand(cmd byte, increment int) {
 			}
 		}
 	case '<':
-		if p == 0 {
+		if p-increment < 0 {
 			return
 		}
 
@@ -42,13 +43,14 @@ func evalCommand(cmd byte, increment int) {
 	case '.':
 		if raw {
 			fmt.Print(cells[p])
-		} else {
-			fmt.Print(string(cells[p]))
+
+			if increment > 1 {
+				evalCommand(cmd, increment-1)
+			}
+			return
 		}
 
-		if increment > 1 {
-			evalCommand(cmd, increment-1)
-		}
+		fmt.Print(strings.Repeat(string(cells[p]), increment))
 	case ',':
 		var putInto string
 		fmt.Scanln(&putInto)
@@ -68,7 +70,6 @@ func eval(code string) {
 
 	for s := 0; s < len(code); s++ {
 		if optimized {
-
 			if len(instructions) == 0 || code[s] == '[' || code[s] == ']' {
 				goto addInstruction
 			} else {
@@ -77,8 +78,6 @@ func eval(code string) {
 				if (*latestInt)[0] == int(code[s]) {
 					(*latestInt)[1]++
 					continue
-				} else {
-					goto addInstruction
 				}
 			}
 
@@ -126,7 +125,6 @@ func eval(code string) {
 					continue
 				}
 			}
-
 			evalCommand(byte(instruction[0]), instruction[1])
 		}
 	} else {
@@ -143,7 +141,6 @@ func eval(code string) {
 					continue
 				}
 			}
-
 			evalCommand(code[i], 1)
 		}
 	}
@@ -160,6 +157,8 @@ func main() {
 	flag.BoolVar(&optimized, "o", false, "toggle interpreter optimization")
 
 	flag.Parse()
+
+	fmt.Println(len(cells))
 
 	if len(flag.Args()) > 0 {
 		file, err := os.ReadFile(flag.Arg(0))
